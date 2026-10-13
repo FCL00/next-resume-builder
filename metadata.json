@@ -1,0 +1,6 @@
+{
+  "name": "ResumAI - AI Resume Builder SaaS",
+  "description": "Build high-impact, professional resumes in minutes with intelligent optional AI writing assistance, customizable templates, and PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

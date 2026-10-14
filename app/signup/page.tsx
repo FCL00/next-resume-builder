@@ -1,18 +1,33 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
-import { Sparkles, ArrowRight, Loader2, Lock, Mail, User } from 'lucide-react';
+import { Loader2, Lock, Mail, User } from 'lucide-react';
 
-export default function SignUpPage() {
+function SignUpForm() {
   const router = useRouter();
-  const { signUp, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const { user, signUp, isLoading } = useAuth();
+
+  const rawRedirect = searchParams.get('redirect');
+  const redirectTarget =
+    rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
+      ? rawRedirect
+      : '/dashboard';
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // If already authenticated and not loading, redirect immediately
+  useEffect(() => {
+    if (!isLoading && user) {
+      router.replace(redirectTarget);
+    }
+  }, [user, isLoading, redirectTarget, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,9 +35,13 @@ export default function SignUpPage() {
     const success = await signUp(email, password, fullName);
     setSubmitting(false);
     if (success) {
-      router.push('/dashboard');
+      router.push(redirectTarget);
     }
   };
+
+  const loginHref = `/login${
+    redirectTarget !== '/dashboard' ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''
+  }`;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -38,7 +57,7 @@ export default function SignUpPage() {
         </h2>
         <p className="mt-1 text-center text-xs text-slate-500">
           Already have an account?{' '}
-          <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <Link href={loginHref} className="font-medium text-indigo-600 hover:text-indigo-500">
             Sign in
           </Link>
         </p>
@@ -104,5 +123,19 @@ export default function SignUpPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        </div>
+      }
+    >
+      <SignUpForm />
+    </Suspense>
   );
 }

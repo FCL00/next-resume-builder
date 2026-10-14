@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { ResumeCard } from '@/components/dashboard/ResumeCard';
@@ -14,25 +15,57 @@ import {
 } from '@/lib/storage/resume-storage';
 import { ResumeRecord, TemplateKey } from '@/types/resume';
 import { BLANK_RESUME_DATA, DEFAULT_RESUME_DATA } from '@/lib/constants/default-resume';
-import { Plus, Sparkles, FileText, LayoutTemplate, Layers, CheckCircle2 } from 'lucide-react';
+import { Plus, Sparkles, FileText, CheckCircle2, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingResumes, setIsLoadingResumes] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isCurrent = true;
+
     async function load() {
-      setIsLoading(true);
-      const data = await fetchAllResumes(user?.id || 'user-demo-1');
-      setResumes(data);
-      setIsLoading(false);
+      if (isAuthLoading) return;
+
+      if (!user) {
+        setIsLoadingResumes(false);
+        setResumes([]);
+        return;
+      }
+
+      setIsLoadingResumes(true);
+      setFetchError(null);
+
+      try {
+        const data = await fetchAllResumes(user.id);
+        if (isCurrent) {
+          setResumes(data);
+        }
+      } catch (err: any) {
+        if (isCurrent) {
+          console.error('Failed to load resumes:', err);
+          setFetchError(err.message || 'We could not load your resumes. Please try again.');
+          toast.error(err.message || 'We could not load your resumes.');
+          setResumes([]);
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoadingResumes(false);
+        }
+      }
     }
+
     load();
-  }, [user?.id]);
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [user, isAuthLoading]);
 
   const handleCreate = async ({
     title,
@@ -43,36 +76,96 @@ export default function DashboardPage() {
     templateId: TemplateKey;
     mode: 'scratch' | 'template' | 'sample';
   }) => {
+    if (!user) {
+      toast.error('Please sign in to create a resume.');
+      router.push('/login');
+      return;
+    }
+
     setIsCreateModalOpen(false);
     toast.loading('Creating resume...');
 
-    let initialData = mode === 'scratch' ? BLANK_RESUME_DATA : DEFAULT_RESUME_DATA;
+    const initialData =
+      mode === 'scratch'
+        ? JSON.parse(JSON.stringify(BLANK_RESUME_DATA))
+        : JSON.parse(JSON.stringify(DEFAULT_RESUME_DATA));
 
-    const newResume = await createNewResume({
-      userId: user?.id || 'user-demo-1',
-      title,
-      templateId,
-      initialData,
-    });
+    // Personalize initial resume data to the current authenticated user
+    if (user.fullName && user.fullName !== 'User') {
+      initialData.personalInfo.fullName = user.fullName;
+    }
+    if (user.email) {
+      initialData.personalInfo.email = user.email;
+    }
 
-    toast.dismiss();
-    toast.success('Resume created!');
-    router.push(`/editor/${newResume.id}`);
+    try {
+      const newResume = await createNewResume({
+        userId: user.id,
+        title,
+        templateId,
+        initialData,
+      });
+
+      toast.dismiss();
+      toast.success('Resume created successfully!');
+      router.push(`/editor/${newResume.id}`);
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || 'Failed to create resume.');
+    }
   };
 
   const handleDuplicate = async (resume: ResumeRecord) => {
+    if (!user) {
+      toast.error('Please sign in to duplicate resumes.');
+      return;
+    }
+
     toast.loading('Duplicating resume...');
-    const copy = await duplicateResumeRecord(resume, user?.id || 'user-demo-1');
-    setResumes((prev) => [copy, ...prev]);
-    toast.dismiss();
-    toast.success('Resume duplicated!');
+    try {
+      const copy = await duplicateResumeRecord(resume, user.id);
+      setResumes((prev) => [copy, ...prev]);
+      toast.dismiss();
+      toast.success('Resume duplicated successfully!');
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || 'Failed to duplicate resume.');
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await deleteResumeRecord(id);
-    setResumes((prev) => prev.filter((r) => r.id !== id));
-    toast.success('Resume deleted');
+    if (!user) {
+      toast.error('Please sign in to delete resumes.');
+      return;
+    }
+
+    try {
+      await deleteResumeRecord(id, user.id);
+      setResumes((prev) => prev.filter((r) => r.id !== id));
+      toast.success('Resume deleted.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete resume.');
+    }
   };
+
+  // Automatically redirect unauthenticated users to the login route
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.replace('/login?redirect=/dashboard');
+    }
+  }, [user, isAuthLoading, router]);
+
+  // Auth Loading state & Redirecting state
+  if (isAuthLoading || !user) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <p className="text-sm font-medium text-slate-500">
+          {isAuthLoading ? 'Loading your account...' : 'Redirecting to sign in...'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -81,7 +174,7 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200/80 pb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Welcome back, {user?.fullName || 'Creator'} 👋
+              Welcome back, {user.fullName} 👋
             </h1>
             <p className="text-sm text-slate-500 mt-1">
               Manage your resumes, customize layouts, or craft a new role-targeted version.
@@ -105,7 +198,7 @@ export default function DashboardPage() {
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs text-slate-500 font-medium">Total Resumes</div>
+              <div className="text-xs text-slate-500 font-medium">My Resumes</div>
               <div className="text-xl font-bold text-slate-900">{resumes.length}</div>
             </div>
           </div>
@@ -115,8 +208,8 @@ export default function DashboardPage() {
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs text-slate-500 font-medium">Export Ready</div>
-              <div className="text-xl font-bold text-slate-900">{resumes.length} / {resumes.length}</div>
+              <div className="text-xs text-slate-500 font-medium">Account Status</div>
+              <div className="text-sm font-semibold text-emerald-700">Authenticated</div>
             </div>
           </div>
 
@@ -126,7 +219,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="text-xs text-slate-500 font-medium">AI Writing Assist</div>
-              <div className="text-xl font-bold text-slate-900">Active & Ready</div>
+              <div className="text-sm font-semibold text-slate-900">On-Demand</div>
             </div>
           </div>
         </div>
@@ -135,10 +228,23 @@ export default function DashboardPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">My Resumes</h2>
-            <span className="text-xs text-slate-400">{resumes.length} document{resumes.length !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-slate-400">
+              {resumes.length} document{resumes.length !== 1 ? 's' : ''}
+            </span>
           </div>
 
-          {isLoading ? (
+          {fetchError ? (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center justify-between">
+              <span>{fetchError}</span>
+              <button
+                type="button"
+                onClick={() => fetchAllResumes(user.id).then(setResumes).catch(() => {})}
+                className="font-semibold underline hover:text-rose-900"
+              >
+                Retry
+              </button>
+            </div>
+          ) : isLoadingResumes ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {[1, 2].map((i) => (
                 <div key={i} className="h-64 rounded-xl bg-slate-200/60 animate-pulse" />
@@ -153,7 +259,7 @@ export default function DashboardPage() {
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">No resumes yet</h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                  Start building your first job-winning resume. You can write it manually or leverage optional AI assistance anytime.
+                  You haven&apos;t created any resumes under this account yet. Click below to start your first one!
                 </p>
               </div>
               <button

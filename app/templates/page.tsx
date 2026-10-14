@@ -7,25 +7,61 @@ import { TEMPLATES_CONFIG, DEFAULT_RESUME_DATA } from '@/lib/constants/default-r
 import { TemplateKey } from '@/types/resume';
 import { createNewResume } from '@/lib/storage/resume-storage';
 import { useAuth } from '@/lib/auth/auth-context';
-import { ArrowRight, Check, Sparkles, LayoutTemplate, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, Sparkles, LayoutTemplate, ShieldCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TemplatesPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey>('modern');
 
+  React.useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/login?redirect=/templates');
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <p className="text-sm font-medium text-slate-500">
+          {isLoading ? 'Loading templates...' : 'Redirecting to sign in...'}
+        </p>
+      </div>
+    );
+  }
+
   const handleCreateWithTemplate = async (templateId: TemplateKey) => {
+    if (!user) {
+      toast.error('Please sign in to create a resume.');
+      router.push('/login?redirect=/templates');
+      return;
+    }
+
     toast.loading('Initializing template...');
-    const newResume = await createNewResume({
-      userId: user?.id || 'user-demo-1',
-      title: `${TEMPLATES_CONFIG.find((t) => t.id === templateId)?.name} Resume`,
-      templateId,
-      initialData: DEFAULT_RESUME_DATA,
-    });
-    toast.dismiss();
-    toast.success('Resume created!');
-    router.push(`/editor/${newResume.id}`);
+    try {
+      const initialData = JSON.parse(JSON.stringify(DEFAULT_RESUME_DATA));
+      if (user.fullName && user.fullName !== 'User') {
+        initialData.personalInfo.fullName = user.fullName;
+      }
+      if (user.email) {
+        initialData.personalInfo.email = user.email;
+      }
+
+      const newResume = await createNewResume({
+        userId: user.id,
+        title: `${TEMPLATES_CONFIG.find((t) => t.id === templateId)?.name} Resume`,
+        templateId,
+        initialData,
+      });
+      toast.dismiss();
+      toast.success('Resume created!');
+      router.push(`/editor/${newResume.id}`);
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || 'Failed to create resume.');
+    }
   };
 
   return (

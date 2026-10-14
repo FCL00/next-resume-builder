@@ -23,8 +23,11 @@ import {
 import { TEMPLATES_CONFIG, DEFAULT_RESUME_DATA } from '@/lib/constants/default-resume';
 import { TemplateKey } from '@/types/resume';
 import { ResumeRenderer } from '@/components/templates/ResumeRenderer';
+import { useAuth } from '@/lib/auth/auth-context';
+import { BuildResumeCTA } from '@/components/shared/BuildResumeCTA';
 
 export default function LandingPage() {
+  const { user } = useAuth();
   const [activeTemplate, setActiveTemplate] = useState<TemplateKey>('modern');
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
 
@@ -83,19 +86,25 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl shadow-xs hover:shadow-md transition-all"
-          >
+          {user ? (
+            <Link
+              href="/dashboard"
+              className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Sign In
+            </Link>
+          )}
+          <BuildResumeCTA className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl shadow-xs hover:shadow-md transition-all">
             <span>Build My Resume</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          </BuildResumeCTA>
         </div>
       </nav>
 
@@ -115,13 +124,10 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-          <Link
-            href="/dashboard"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow-md transition-all"
-          >
+          <BuildResumeCTA className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow-md transition-all">
             <span>Build My Resume</span>
             <ArrowRight className="w-4 h-4" />
-          </Link>
+          </BuildResumeCTA>
 
           <a
             href="#templates"
@@ -285,13 +291,12 @@ export default function LandingPage() {
           </div>
 
           <div className="text-center pt-2">
-            <Link
-              href="/dashboard"
+            <BuildResumeCTA
               className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors"
             >
               <span>Use {TEMPLATES_CONFIG.find((t) => t.id === activeTemplate)?.name}</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            </BuildResumeCTA>
           </div>
         </div>
       </section>
@@ -500,12 +505,11 @@ export default function LandingPage() {
                 </ul>
               </div>
 
-              <Link
-                href="/dashboard"
+              <BuildResumeCTA
                 className="w-full inline-flex items-center justify-center py-2.5 px-4 text-xs font-semibold rounded-xl text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
               >
                 Start for Free
-              </Link>
+              </BuildResumeCTA>
             </div>
 
             {/* Pro Tier */}
@@ -543,12 +547,11 @@ export default function LandingPage() {
                 </ul>
               </div>
 
-              <Link
-                href="/dashboard"
+              <BuildResumeCTA
                 className="w-full inline-flex items-center justify-center py-2.5 px-4 text-xs font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors"
               >
                 Get Started with Pro
-              </Link>
+              </BuildResumeCTA>
             </div>
           </div>
         </div>
@@ -602,13 +605,12 @@ export default function LandingPage() {
             Take control of your career story with our clean, reliable editor and optional AI assistance.
           </p>
           <div className="pt-2">
-            <Link
-              href="/dashboard"
+            <BuildResumeCTA
               className="inline-flex items-center gap-2 px-6 py-3 text-xs font-semibold text-indigo-600 bg-white hover:bg-slate-50 rounded-xl shadow-md transition-all"
             >
               <span>Build My Resume Now</span>
               <ArrowRight className="w-4 h-4" />
-            </Link>
+            </BuildResumeCTA>
           </div>
         </div>
       </section>
@@ -627,7 +629,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-6">
             <a href="#features" className="hover:text-slate-800 transition-colors">Features</a>
             <a href="#templates" className="hover:text-slate-800 transition-colors">Templates</a>
-            <Link href="/dashboard" className="hover:text-slate-800 transition-colors">Dashboard</Link>
+            <BuildResumeCTA className="hover:text-slate-800 transition-colors">Dashboard</BuildResumeCTA>
             <Link href="/login" className="hover:text-slate-800 transition-colors">Sign In</Link>
           </div>
         </div>

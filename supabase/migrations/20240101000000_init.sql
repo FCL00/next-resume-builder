@@ -21,15 +21,19 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own profile"
   ON public.profiles FOR SELECT
-  USING (auth.uid() = id);
+  TO authenticated
+  USING ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
-  USING (auth.uid() = id);
+  TO authenticated
+  USING ((SELECT auth.uid()) = id)
+  WITH CHECK ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
+  TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = id);
 
 -- 2. Resumes Table
 CREATE TABLE IF NOT EXISTS public.resumes (
@@ -47,23 +51,37 @@ CREATE INDEX IF NOT EXISTS resumes_user_id_idx ON public.resumes(user_id);
 CREATE INDEX IF NOT EXISTS resumes_updated_at_idx ON public.resumes(updated_at DESC);
 
 -- Row Level Security (RLS) for Resumes
+-- Every operation strictly checks (SELECT auth.uid()) = user_id
 ALTER TABLE public.resumes ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own resumes"
+DROP POLICY IF EXISTS "Users can view own resumes" ON public.resumes;
+DROP POLICY IF EXISTS "Users can view their own resumes" ON public.resumes;
+CREATE POLICY "Users can view their own resumes"
   ON public.resumes FOR SELECT
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
 
-CREATE POLICY "Users can insert own resumes"
+DROP POLICY IF EXISTS "Users can insert own resumes" ON public.resumes;
+DROP POLICY IF EXISTS "Users can create their own resumes" ON public.resumes;
+CREATE POLICY "Users can create their own resumes"
   ON public.resumes FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
-CREATE POLICY "Users can update own resumes"
+DROP POLICY IF EXISTS "Users can update own resumes" ON public.resumes;
+DROP POLICY IF EXISTS "Users can update their own resumes" ON public.resumes;
+CREATE POLICY "Users can update their own resumes"
   ON public.resumes FOR UPDATE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
-CREATE POLICY "Users can delete own resumes"
+DROP POLICY IF EXISTS "Users can delete own resumes" ON public.resumes;
+DROP POLICY IF EXISTS "Users can delete their own resumes" ON public.resumes;
+CREATE POLICY "Users can delete their own resumes"
   ON public.resumes FOR DELETE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
 
 -- 3. AI Usage Tracking Table (Cost & usage limits)
 CREATE TABLE IF NOT EXISTS public.ai_usage (
@@ -80,13 +98,17 @@ CREATE INDEX IF NOT EXISTS ai_usage_user_id_idx ON public.ai_usage(user_id);
 
 ALTER TABLE public.ai_usage ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own AI usage" ON public.ai_usage;
 CREATE POLICY "Users can view own AI usage"
   ON public.ai_usage FOR SELECT
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own AI usage" ON public.ai_usage;
 CREATE POLICY "Users can insert own AI usage"
   ON public.ai_usage FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
 -- 4. Automatic updated_at Timestamp Trigger
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
@@ -118,7 +140,10 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
     NEW.raw_user_meta_data->>'avatar_url'
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    avatar_url = EXCLUDED.avatar_url,
+    updated_at = timezone('utc'::text, now());
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

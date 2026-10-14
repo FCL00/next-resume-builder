@@ -1,20 +1,89 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/lib/auth/auth-context';
-import { User, Shield, Sparkles, Database, CheckCircle2, Key, Info } from 'lucide-react';
+import { User, Sparkles, Database, CheckCircle2, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function SettingsPage() {
-  const { user, isSupabaseConnected } = useAuth();
-  const [fullName, setFullName] = useState(user?.fullName || 'Alex Morgan');
-  const [email, setEmail] = useState(user?.email || 'alex.morgan@example.com');
+function ProfileForm({ initialName, initialEmail }: { initialName: string; initialEmail: string }) {
+  const [fullName, setFullName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     toast.success('Profile preferences updated');
   };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-6">
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+          <User className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">User Profile</h2>
+          <p className="text-xs text-slate-500">Your personal identity across your resumes</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSaveProfile} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-indigo-500"
+            />
+          </div>
+        </div>
+
+        <div className="pt-2 flex justify-end">
+          <button
+            type="submit"
+            className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors"
+          >
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export default function SettingsPage() {
+  const router = useRouter();
+  const { user, isLoading, isSupabaseConnected } = useAuth();
+
+  React.useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/login?redirect=/settings');
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <p className="text-sm font-medium text-slate-500">
+          {isLoading ? 'Loading settings...' : 'Redirecting to sign in...'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -26,51 +95,12 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* Profile Card */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <User className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">User Profile</h2>
-              <p className="text-xs text-slate-500">Your personal identity across your resumes</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors"
-              >
-                Save Changes
-              </button>
-            </div>
-          </form>
-        </div>
+        {/* Profile Card with key-based state reset */}
+        <ProfileForm
+          key={user?.id || 'guest'}
+          initialName={user?.fullName || ''}
+          initialEmail={user?.email || ''}
+        />
 
         {/* Integration Status Card */}
         <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-5">
